@@ -16,9 +16,12 @@ def send_alert(subject):
     msg['To'] = MAIL_TO
 
     smtp = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+
     if SMTP_TLS:
         smtp.starttls()
+
     if SMTP_USER is not None and SMTP_PASSWORD is not None:
         smtp.login(SMTP_USER, SMTP_PASSWORD)
+
     smtp.sendmail(MAIL_FROM, [MAIL_TO], msg.as_string())
     smtp.quit()

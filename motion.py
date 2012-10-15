@@ -48,7 +48,7 @@ class MotionSensor(threading.Thread):
 
         # Load depth filter
         try:
-            depth_filter = numpy.load("depth_filter.npy")
+            depth_filter = numpy.load("depth_filter.%d.npy" % device_num)
         except Exception:
             depth_filter = None
 
