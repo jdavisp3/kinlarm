@@ -14,18 +14,17 @@ from config import DECAY_K
 def frame_to_depth(frame):
     mask = frame > 1070
     frame = frame.astype(numpy.float)
+
     # Calculate depth in meters as a function of depth value
     depth = 1.0 / (frame * -0.0030711016 + 3.3309495161)
+
     # Fill the masked (invalid) areas with "5 meters" for computational purposes
     depth = numpy.ma.filled(numpy.ma.array(depth, mask=mask), 5)
 
     return depth, mask
 
-def bool_to_img(frame):
-    return 255 * frame.astype(numpy.uint8)
-
 def depth_to_img(frame):
-    return 255-((30 * frame).astype(numpy.uint8))
+    return 255 - ((30 * frame).astype(numpy.uint8))
 
 def delta_to_img(frame):
     return numpy.clip((60 * frame), 0, 255).astype(numpy.uint8)
@@ -33,16 +32,19 @@ def delta_to_img(frame):
 
 class MotionSensor(threading.Thread):
 
-    def __init__(self, kinect):
+    def __init__(self, kinect, device_num=0):
         threading.Thread.__init__(self, name="MotionSensor")
         self.kinect = kinect
+        self.device_num = device_num
         self.debug = False
         self.detected = threading.Event()
         self.keep_running = True
 
     def run(self):
         self.detected.clear()
-        stream = self.kinect.depth_stream(5)
+
+        stream = self.kinect.new_consumer('depth', device_num=self.device_num,
+                                          decimate=5)
 
         # Load depth filter
         try:
@@ -50,7 +52,7 @@ class MotionSensor(threading.Thread):
         except Exception:
             depth_filter = None
 
-        # Drop initial frames that are less than 50% valid
+        # Drop initial frames that do not meet the valid threshold
         while numpy.count_nonzero(stream.next() != 2047) < VALID_THRESHOLD:
             if not self.keep_running:
                 return
@@ -127,9 +129,9 @@ class MotionSensor(threading.Thread):
 
             if self.debug:
                 print motion > MOTION_THRESHOLD, lost_count > LOST_THRESHOLD
-                cv2.imshow("Ref", depth_to_img(masked_ref))
-                cv2.imshow("Depth", depth_to_img(masked_depth))
-                cv2.imshow("Delta", delta_to_img(numpy.ma.filled(delta, 0)))
+                cv2.imshow("Ref %d" % self.device_num, depth_to_img(masked_ref))
+                cv2.imshow("Depth %d" % self.device_num, depth_to_img(masked_depth))
+                cv2.imshow("Delta %d" % self.device_num, delta_to_img(numpy.ma.filled(delta, 0)))
                 if cv2.waitKey(10) == 27:
                     return
 
@@ -152,11 +154,18 @@ class MotionSensor(threading.Thread):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
     kinect = kinectcore.KinectStreamer()
     kinect.start()
     try:
-        motion = MotionSensor(kinect)
-        motion.debug = True
-        motion.run()
+        kinect.initialized.wait()
+        if kinect.num_devices == 0:
+            logging.error("no kinect devices")
+        else:
+            sensors = [MotionSensor(kinect, device_num)
+                       for device_num in range(kinect.num_devices)]
+            for sensor in sensors:
+                sensor.debug = True
+                sensor.run()
     finally:
         kinect.stop()
