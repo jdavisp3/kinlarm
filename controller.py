@@ -52,6 +52,7 @@ class AlarmSystem(object):
 
         self.state = self.disarmed
         self.new_state = None
+
         while True:
             self.state = self.state()
             with self.lock:

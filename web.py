@@ -86,36 +86,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.check_auth():
             return
-
-        if self.path in ("/video", "/depth"):
-            self.send_response(200)
-            self.send_header("Connection", "Close")
-            self.send_header("Pragma", "no-cache")
-            self.send_header("Expires", "0")
-            self.send_header("Content-Type", "multipart/x-mixed-replace;boundary=" + self.MIMETAG)
-            self.end_headers()
-
-            if self.path == "/video":
-                stream = self.server.kinect.video_stream(15)
-            else:
-                stream = self.server.kinect.depth_stream(15)
-
-            for frame in stream:
-                if self.path == "/video":
-                    im = self.video_to_image(frame)
-                else:
-                    im = self.depth_to_image(frame)
-                fd = StringIO.StringIO()
-                im.save(fd, "JPEG", quality=75)
-                data = fd.getvalue()
-                self.wfile.write("--" + self.MIMETAG + "\r\n")
-                self.send_header("Content-Type", "image/jpeg")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-                self.wfile.flush()
-                if not self.server.keep_running:
-                    break
+        elif self.path.startswith('/video') or self.path.startswith('/depth'):
+            self.send_stream()
         elif self.path == "/":
             self.send_html(self.template("index.html"))
         elif self.path == "/state":
@@ -129,6 +101,42 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_data(data, mimetypes.guess_type(self.path))
         else:
             self.send_error(404)
+
+    def send_stream(self):
+        parts = self.path.split('/')
+        stream_type = parts[1]
+        if len(parts) == 3:
+            device_num = int(parts[2])
+        else:
+            assert len(parts) == 2
+            device_num = 0
+
+        self.send_response(200)
+        self.send_header("Connection", "Close")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        self.send_header("Content-Type", "multipart/x-mixed-replace;boundary=" + self.MIMETAG)
+        self.end_headers()
+
+        stream = self.server.kinect.new_consumer(stream_type, device_num=device_num, decimate=15)
+
+        for frame in stream:
+            if stream_type == "video":
+                im = self.video_to_image(frame)
+            else:
+                im = self.depth_to_image(frame)
+            fd = StringIO.StringIO()
+            im.save(fd, "JPEG", quality=75)
+            data = fd.getvalue()
+            self.wfile.write("--" + self.MIMETAG + "\r\n")
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            self.wfile.flush()
+
+            if not self.server.keep_running:
+                break
 
     def send_redirect(self, to):
         uri = "http://" + self.headers["Host"] + to
@@ -211,7 +219,6 @@ class WebServer(threading.Thread):
     def stop(self):
         if not self.is_alive():
             return
-        logging.info("Web server stopped")
         self.httpd.keep_running = False
         # Make a fake request to trigger thread exit
         try:
@@ -221,3 +228,4 @@ class WebServer(threading.Thread):
         except urllib2.HTTPError:
             pass
         self.join()
+        logging.info("Web server stopped")

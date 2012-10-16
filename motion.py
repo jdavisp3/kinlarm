@@ -48,7 +48,7 @@ class MotionSensor(threading.Thread):
 
         # Load depth filter
         try:
-            depth_filter = numpy.load("depth_filter.%d.npy" % device_num)
+            depth_filter = numpy.load("depth_filter.%d.npy" % self.device_num)
         except Exception:
             depth_filter = None
 
@@ -153,19 +153,29 @@ class MotionSensor(threading.Thread):
         logging.info("Motion detection stopped")
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="generate a depth filter file")
+    parser.add_argument('--device-num', default=0, type=int,
+                        help='the device number of the sensor')
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)s: %(message)s')
+
     kinect = kinectcore.KinectStreamer()
     kinect.start()
+
     try:
         kinect.initialized.wait()
         if kinect.num_devices == 0:
             logging.error("no kinect devices")
         else:
-            sensors = [MotionSensor(kinect, device_num)
-                       for device_num in range(kinect.num_devices)]
-            for sensor in sensors:
-                sensor.debug = True
-                sensor.run()
+            sensor = MotionSensor(kinect, args.device_num)
+            sensor.debug = True
+            sensor.run()
     finally:
         kinect.stop()
+
+if __name__ == "__main__":
+    main()
