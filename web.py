@@ -49,8 +49,11 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     MIMETAG = "SW4gU292aWV0IFJ1c3NpYSwgQkFTRTY0IGRlY29kZXMgWU9VIQo="
 
-    STATIC = set([
-            "/jquery.js"
+    STATIC = frozenset([
+            "/jquery-1.8.2.min.js",
+            "/underscore-1.4.2.min.js",
+            "/kinlarm.css",
+            "/kinlarm.js",
             ])
 
     def request_auth(self):
@@ -90,6 +93,8 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_stream()
         elif self.path == "/":
             self.send_html(self.template("index.html"))
+        elif self.path == "/num_devices":
+            self.send_text(str(self.server.controller.kinect.num_devices))
         elif self.path == "/state":
             self.send_text(self.server.controller.state.__name__.title())
         elif self.path.startswith("/setstate?"):
@@ -98,7 +103,7 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.server.controller.switch_state(parsed_path.query)
         elif self.path in self.STATIC:
             data = self.template(self.path[1:])
-            self.send_data(data, mimetypes.guess_type(self.path))
+            self.send_data(data, mimetypes.guess_type(self.path)[0])
         else:
             self.send_error(404)
 

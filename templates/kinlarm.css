@@ -1,0 +1,22 @@
+body {
+    font-family: sans-serif;
+}
+
+.stream {
+    border: 2px solid grey;
+    background-color: black;
+    color: white;
+    padding: 10px;
+    margin: 5px;
+    text-align: center;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.stream img {
+    float: center;
+}
+
+.state {
+    font-size: 150%;
+}

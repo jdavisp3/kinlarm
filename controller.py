@@ -24,6 +24,9 @@ class AlarmSystem(object):
         self.sounder = sounder.AudioSounder()
         self.lock = threading.Lock()
 
+        self.state = self.disarmed
+        self.new_state = None
+
         self.threads = [
             self.kinect,
             self.motion,
@@ -49,9 +52,6 @@ class AlarmSystem(object):
     def body(self):
         self.kinect.start()
         self.web.start()
-
-        self.state = self.disarmed
-        self.new_state = None
 
         while True:
             self.state = self.state()
